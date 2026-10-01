@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Live Chart</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="https://s3.tradingview.com/tv.js"></script>
+<style>
+  :root { --bg:#0b0e11; --panel:#161a1f; --line:#232a31; --text:#e6e8ea; --accent:#f0b90b; }
+  * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+  html, body { height:100%; background:var(--bg); color:var(--text);
+    font-family:-apple-system, "Segoe UI", Roboto, sans-serif; overflow:hidden; }
+  .app { display:flex; flex-direction:column; height:100%; }
+  .bar { display:flex; gap:6px; padding:8px; background:var(--panel); border-bottom:1px solid var(--line);
+    overflow-x:auto; scrollbar-width:none; flex:0 0 auto; }
+  .bar::-webkit-scrollbar { display:none; }
+  .sep { width:1px; background:var(--line); margin:0 4px; flex:0 0 1px; }
+  button { background:transparent; color:var(--text); border:1px solid var(--line); border-radius:8px;
+    padding:7px 12px; font-size:13px; font-weight:600; cursor:pointer; white-space:nowrap; }
+  button.active { background:var(--accent); color:#000; border-color:var(--accent); }
+  #tv { flex:1 1 auto; min-height:0; }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="bar" id="bar"></div>
+  <div id="tv"></div>
+</div>
+
+<script>
+  const tg = window.Telegram && window.Telegram.WebApp;
+  if (tg) {
+    tg.ready();
+    tg.expand();
+    try { tg.setHeaderColor("#161a1f"); tg.setBackgroundColor("#0b0e11"); } catch (e) {}
+  }
+
+  const COINS = { BTC:"BINANCE:BTCUSDT", ETH:"BINANCE:ETHUSDT", SOL:"BINANCE:SOLUSDT",
+                  XRP:"BINANCE:XRPUSDT", BNB:"BINANCE:BNBUSDT" };
+  const TFS = { "15m":"15", "1H":"60", "4H":"240", "1D":"D" };
+
+  let coin = "BTC", tf = "60";
+
+  // монета з посилання: t.me/bot/chart?startapp=ETH
+  const sp = tg && tg.initDataUnsafe && tg.initDataUnsafe.start_param;
+  if (sp && COINS[sp.toUpperCase()]) coin = sp.toUpperCase();
+
+  function drawChart() {
+    document.getElementById("tv").innerHTML = "";
+    new TradingView.widget({
+      container_id: "tv",
+      autosize: true,
+      symbol: COINS[coin],
+      interval: tf,
+      timezone: "Europe/Kyiv",
+      theme: "dark",
+      style: "1",
+      locale: "uk",
+      backgroundColor: "#0b0e11",
+      gridColor: "#161a1f",
+      toolbar_bg: "#0b0e11",
+      enable_publishing: false,
+      allow_symbol_change: false,
+      hide_side_toolbar: false,
+      save_image: false
+    });
+  }
+
+  function buildBar() {
+    const bar = document.getElementById("bar");
+    bar.innerHTML = "";
+    Object.keys(COINS).forEach(c => {
+      const b = document.createElement("button");
+      b.textContent = c;
+      if (c === coin) b.className = "active";
+      b.onclick = () => { coin = c; buildBar(); drawChart(); };
+      bar.appendChild(b);
+    });
+    const s = document.createElement("div"); s.className = "sep"; bar.appendChild(s);
+    Object.entries(TFS).forEach(([label, val]) => {
+      const b = document.createElement("button");
+      b.textContent = label;
+      if (val === tf) b.className = "active";
+      b.onclick = () => { tf = val; buildBar(); drawChart(); };
+      bar.appendChild(b);
+    });
+  }
+
+  buildBar();
+  drawChart();
+</script>
+</body>
+</html>
