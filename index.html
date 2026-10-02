@@ -3,92 +3,217 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>Live Chart</title>
+<meta name="theme-color" content="#0b0e11">
+<title>Crypice Live</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script src="https://s3.tradingview.com/tv.js"></script>
 <style>
-  :root { --bg:#0b0e11; --panel:#161a1f; --line:#232a31; --text:#e6e8ea; --accent:#f0b90b; }
+  :root {
+    --bg:#0b0e11; --panel:#12161b; --line:#222a33; --text:#e6e8ea; --muted:#7d8793;
+    --accent:#f0b90b; --up:#2ebd85; --down:#f6465d;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
   * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
   html, body { height:100%; background:var(--bg); color:var(--text);
     font-family:-apple-system, "Segoe UI", Roboto, sans-serif; overflow:hidden; }
-  .app { display:flex; flex-direction:column; height:100%; }
-  .bar { display:flex; gap:6px; padding:8px; background:var(--panel); border-bottom:1px solid var(--line);
+  .app { display:flex; flex-direction:column; height:100%; padding-bottom:env(safe-area-inset-bottom, 0px); }
+
+  /* шапка */
+  .head { display:flex; align-items:center; justify-content:space-between;
+    padding:10px 14px 8px; background:var(--panel); flex:0 0 auto; }
+  .logo { display:flex; align-items:center; gap:8px; font-family:var(--mono);
+    font-weight:800; letter-spacing:2px; font-size:15px; }
+  .mark { width:10px; height:10px; background:var(--accent); transform:rotate(45deg); border-radius:2px; }
+  .tag { font-size:10px; letter-spacing:1px; color:#000; background:var(--accent);
+    padding:2px 6px; border-radius:4px; font-weight:800; }
+  .src { display:flex; align-items:center; gap:6px; font-size:11px; color:var(--muted); font-family:var(--mono); }
+  .dot { width:6px; height:6px; border-radius:50%; background:var(--up); animation:pulse 1.8s infinite; }
+  @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.3; } }
+
+  /* монети */
+  .coins { display:flex; gap:6px; padding:0 10px 8px; background:var(--panel);
     overflow-x:auto; scrollbar-width:none; flex:0 0 auto; }
-  .bar::-webkit-scrollbar { display:none; }
-  .sep { width:1px; background:var(--line); margin:0 4px; flex:0 0 1px; }
-  button { background:transparent; color:var(--text); border:1px solid var(--line); border-radius:8px;
-    padding:7px 12px; font-size:13px; font-weight:600; cursor:pointer; white-space:nowrap; }
-  button.active { background:var(--accent); color:#000; border-color:var(--accent); }
-  #tv { flex:1 1 auto; min-height:0; }
+  .coins::-webkit-scrollbar, .tfs::-webkit-scrollbar { display:none; }
+  .chip { flex:1 0 66px; background:var(--bg); border:1px solid var(--line); border-radius:10px;
+    padding:7px 6px; text-align:center; cursor:pointer; transition:border-color .15s, transform .1s; }
+  .chip:active { transform:scale(.96); }
+  .chip.active { border-color:var(--accent); box-shadow:0 0 0 1px var(--accent) inset; }
+  .chip .k { font-size:12px; font-weight:800; letter-spacing:.5px; }
+  .chip .p { font-family:var(--mono); font-size:11px; margin-top:2px; color:var(--text); }
+  .chip .c { font-family:var(--mono); font-size:10px; margin-top:1px; color:var(--muted); }
+  .chip .c.up { color:var(--up); } .chip .c.down { color:var(--down); }
+
+  /* таймфрейми */
+  .tfs { display:flex; gap:4px; padding:0 10px 8px; background:var(--panel);
+    border-bottom:1px solid var(--line); overflow-x:auto; scrollbar-width:none; flex:0 0 auto; }
+  .tf { flex:1; background:transparent; color:var(--muted); border:0; border-radius:7px;
+    padding:6px 0; font-family:var(--mono); font-size:12px; font-weight:700; cursor:pointer; }
+  .tf.active { background:var(--accent); color:#000; }
+
+  /* графік + заставка */
+  .chart { position:relative; flex:1 1 auto; min-height:0; }
+  #tv { position:absolute; inset:0; }
+  .splash { position:absolute; inset:0; background:var(--bg); display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:14px; z-index:5; transition:opacity .35s; }
+  .splash.hide { opacity:0; pointer-events:none; }
+  .splash .big { font-family:var(--mono); font-weight:800; letter-spacing:4px; font-size:20px; }
+  .splash .bar { width:120px; height:3px; background:var(--line); border-radius:2px; overflow:hidden; }
+  .splash .bar::after { content:""; display:block; width:40%; height:100%; background:var(--accent);
+    animation:slide 1s infinite ease-in-out; }
+  @keyframes slide { 0% { transform:translateX(-100%); } 100% { transform:translateX(300%); } }
 </style>
 </head>
 <body>
 <div class="app">
-  <div class="bar" id="bar"></div>
-  <div id="tv"></div>
+  <div class="head">
+    <div class="logo"><span class="mark"></span>CRYPICE<span class="tag">LIVE</span></div>
+    <div class="src"><span class="dot"></span>Binance · USDT</div>
+  </div>
+  <div class="coins" id="coins"></div>
+  <div class="tfs" id="tfs"></div>
+  <div class="chart">
+    <div id="tv"></div>
+    <div class="splash" id="splash">
+      <div class="big">CRYPICE</div>
+      <div class="bar"></div>
+    </div>
+  </div>
 </div>
 
 <script>
   const tg = window.Telegram && window.Telegram.WebApp;
+  function haptic() { try { tg.HapticFeedback.selectionChanged(); } catch (e) {} }
   if (tg) {
-    tg.ready();
-    tg.expand();
-    try { tg.setHeaderColor("#161a1f"); tg.setBackgroundColor("#0b0e11"); } catch (e) {}
+    try { tg.ready(); } catch (e) {}
+    try { tg.expand(); } catch (e) {}
+    try { tg.disableVerticalSwipes(); } catch (e) {}   // щоб свайп по графіку не закривав вікно
+    try { tg.setHeaderColor("#12161b"); tg.setBackgroundColor("#0b0e11"); } catch (e) {}
+    try { tg.setBottomBarColor("#0b0e11"); } catch (e) {}
   }
 
-  const COINS = { BTC:"BINANCE:BTCUSDT", ETH:"BINANCE:ETHUSDT", SOL:"BINANCE:SOLUSDT",
-                  XRP:"BINANCE:XRPUSDT", BNB:"BINANCE:BNBUSDT" };
-  const TFS = { "15m":"15", "1H":"60", "4H":"240", "1D":"D" };
+  const COINS = [
+    { k:"BTC", s:"BTCUSDT" }, { k:"ETH", s:"ETHUSDT" }, { k:"SOL", s:"SOLUSDT" },
+    { k:"XRP", s:"XRPUSDT" }, { k:"BNB", s:"BNBUSDT" }
+  ];
+  const TFS = [ ["15m","15"], ["1H","60"], ["4H","240"], ["1D","D"] ];
 
-  let coin = "BTC", tf = "60";
+  function load(key, fallback) { try { return localStorage.getItem(key) || fallback; } catch (e) { return fallback; } }
+  function save(key, val) { try { localStorage.setItem(key, val); } catch (e) {} }
 
-  // монета з посилання: t.me/bot/chart?startapp=ETH
+  let coin = load("cx_coin", "BTC");
+  let tf = load("cx_tf", "60");
+  if (!COINS.find(c => c.k === coin)) coin = "BTC";
+  if (!TFS.find(t => t[1] === tf)) tf = "60";
+
+  // монета з посилання: t.me/бот/chart?startapp=ETH (має пріоритет)
   const sp = tg && tg.initDataUnsafe && tg.initDataUnsafe.start_param;
-  if (sp && COINS[sp.toUpperCase()]) coin = sp.toUpperCase();
+  if (sp && COINS.find(c => c.k === sp.toUpperCase())) coin = sp.toUpperCase();
+
+  function fmtPrice(p) {
+    if (p == null || isNaN(p)) return "···";
+    if (p >= 1000) return p.toLocaleString("en-US", { maximumFractionDigits: 0 });
+    if (p >= 1) return p.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return p.toFixed(4);
+  }
+
+  function renderChips() {
+    const el = document.getElementById("coins");
+    el.innerHTML = COINS.map(c => {
+      const has = typeof c.chg === "number";
+      const cls = !has ? "" : (c.chg >= 0 ? "up" : "down");
+      const txt = !has ? "···" : (c.chg >= 0 ? "+" : "") + c.chg.toFixed(2) + "%";
+      return `<div class="chip ${c.k === coin ? "active" : ""}" data-k="${c.k}">
+        <div class="k">${c.k}</div>
+        <div class="p">${fmtPrice(c.price)}</div>
+        <div class="c ${cls}">${txt}</div>
+      </div>`;
+    }).join("");
+  }
+
+  function renderTfs() {
+    const el = document.getElementById("tfs");
+    el.innerHTML = TFS.map(t =>
+      `<button class="tf ${t[1] === tf ? "active" : ""}" data-v="${t[1]}">${t[0]}</button>`
+    ).join("");
+  }
+
+  document.getElementById("coins").addEventListener("click", e => {
+    const chip = e.target.closest(".chip");
+    if (!chip || chip.dataset.k === coin) return;
+    coin = chip.dataset.k; save("cx_coin", coin); haptic();
+    renderChips(); drawChart();
+  });
+  document.getElementById("tfs").addEventListener("click", e => {
+    const b = e.target.closest(".tf");
+    if (!b || b.dataset.v === tf) return;
+    tf = b.dataset.v; save("cx_tf", tf); haptic();
+    renderTfs(); drawChart();
+  });
+
+  async function loadTickers() {
+    try {
+      const syms = encodeURIComponent(JSON.stringify(COINS.map(c => c.s)));
+      const r = await fetch("https://data-api.binance.vision/api/v3/ticker/24hr?symbols=" + syms);
+      const d = await r.json();
+      d.forEach(t => {
+        const c = COINS.find(x => x.s === t.symbol);
+        if (c) { c.price = parseFloat(t.lastPrice); c.chg = parseFloat(t.priceChangePercent); }
+      });
+      renderChips();
+    } catch (e) { /* без цін чіпи просто показують ··· */ }
+  }
+
+  const splash = document.getElementById("splash");
+  function hideSplash() { splash.classList.add("hide"); }
 
   function drawChart() {
-    document.getElementById("tv").innerHTML = "";
+    splash.classList.remove("hide");
+    const box = document.getElementById("tv");
+    box.innerHTML = "";
     new TradingView.widget({
       container_id: "tv",
       autosize: true,
-      symbol: COINS[coin],
+      symbol: "BINANCE:" + coin + "USDT",
       interval: tf,
       timezone: "Europe/Kyiv",
       theme: "dark",
       style: "1",
       locale: "uk",
       backgroundColor: "#0b0e11",
-      gridColor: "#161a1f",
+      gridColor: "#12161b",
       toolbar_bg: "#0b0e11",
       enable_publishing: false,
       allow_symbol_change: false,
       hide_side_toolbar: false,
-      save_image: false
+      save_image: false,
+      overrides: {
+        "paneProperties.background": "#0b0e11",
+        "paneProperties.backgroundType": "solid",
+        "paneProperties.vertGridProperties.color": "#12161b",
+        "paneProperties.horzGridProperties.color": "#12161b",
+        "mainSeriesProperties.candleStyle.upColor": "#2ebd85",
+        "mainSeriesProperties.candleStyle.downColor": "#f6465d",
+        "mainSeriesProperties.candleStyle.borderUpColor": "#2ebd85",
+        "mainSeriesProperties.candleStyle.borderDownColor": "#f6465d",
+        "mainSeriesProperties.candleStyle.wickUpColor": "#2ebd85",
+        "mainSeriesProperties.candleStyle.wickDownColor": "#f6465d"
+      }
     });
+    // ховаємо заставку, коли iframe графіка завантажився (страховка: максимум 3 с)
+    let tries = 0;
+    const iv = setInterval(() => {
+      const f = box.querySelector("iframe");
+      tries++;
+      if (f) { clearInterval(iv); f.addEventListener("load", hideSplash); setTimeout(hideSplash, 3000); }
+      else if (tries > 30) { clearInterval(iv); hideSplash(); }
+    }, 100);
   }
 
-  function buildBar() {
-    const bar = document.getElementById("bar");
-    bar.innerHTML = "";
-    Object.keys(COINS).forEach(c => {
-      const b = document.createElement("button");
-      b.textContent = c;
-      if (c === coin) b.className = "active";
-      b.onclick = () => { coin = c; buildBar(); drawChart(); };
-      bar.appendChild(b);
-    });
-    const s = document.createElement("div"); s.className = "sep"; bar.appendChild(s);
-    Object.entries(TFS).forEach(([label, val]) => {
-      const b = document.createElement("button");
-      b.textContent = label;
-      if (val === tf) b.className = "active";
-      b.onclick = () => { tf = val; buildBar(); drawChart(); };
-      bar.appendChild(b);
-    });
-  }
-
-  buildBar();
+  renderChips();
+  renderTfs();
   drawChart();
+  loadTickers();
+  setInterval(loadTickers, 15000);
 </script>
 </body>
 </html>
